@@ -2,8 +2,7 @@
 /*
  * NAS Converters usage example
  * @author Rauno Avel
- * @copyright NAS 2018
- * @version 7.0 (30.12.2018)
+ * @copyright NAS 2019
 */
 
 require 'src/nascv.php';

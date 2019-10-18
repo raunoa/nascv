@@ -2,13 +2,13 @@
 /*
  * NAS Converters
  * @author Rauno Avel
- * @copyright NAS 2018
- * @version 7.7
+ * @copyright NAS 2019
+ * @version 8.1
  */
 
 class nascv
 {
-    public $version = 7.7; // NAS converter version
+    public $version = 8.1; // NAS converter version
 
     public $unit = ''; // message unit
     public $type = ''; // message converting type
@@ -17,8 +17,11 @@ class nascv
     public $data = ''; // message data
     public $description = ''; // message description
     public $product = ''; // Product type
+    public $product_name = 'n/a'; // Product name
+    public $product_upn = 'n/a'; // Product name
     public $overwrite = false; // if true, then can set library manually
-    public $firmware = ''; // device firmware
+    public $firmware = ''; // device firmware (from v5.4)
+    public $firmware_patch = ''; // device firmware patch (from v8)
     public $show_hex = true; // show-ing hex in status parsers
     public $hex = '';
     public $fport = '';
@@ -29,6 +32,7 @@ class nascv
     private $apc = array(); // caching
     private $lib; // library
     private $obj; // need for cache struct objects
+    private $encrypt_key; // encryption key
 
     /**
      * nascv constructor.
@@ -72,6 +76,12 @@ class nascv
             $this->direction = strtolower( $msg[ 'direction' ] );
         }
 
+        if (isset( $msg[ 'encrypt_key' ] )) {
+            $this->encrypt_key = strtolower( $msg[ 'encrypt_key' ] );
+        } else {
+            $this->encrypt_key = '';
+        }
+
         # there is 2 way's how fport is named
         $this->fport = (isset( $msg[ 'fPort' ] ) ? $msg[ 'fPort' ] : $msg[ 'fport' ]);
 
@@ -106,12 +116,24 @@ class nascv
         # set firmware if isset firmware data (from v5.7)
         $this->firmware = '';
         if (isset( $msg[ 'firmware' ] )) {
-            $this->firmware = $msg[ 'firmware' ];
+            $this->firmware = (float)$msg[ 'firmware' ];
+        }
+
+        # set firmware patch (from v8.0)
+        $this->firmware_patch = '';
+        if (isset( $msg[ 'firmware' ] )) {
+            $e = explode( '.', $msg[ 'firmware' ] );
+            if (count( $e ) > 1) {
+                $this->firmware_patch = (int)end( $e );
+                if ($this->firmware_patch == '' or !is_numeric( $this->firmware_patch )) {
+                    $this->firmware_patch = 0;
+                }
+            }
         }
 
         # start parsering data by given library structure
         $l = $this->call_library( $library );
-        if ($this->type == 'hex') {
+        if ($l !== false and $this->type == 'hex') {
             $struct = ($this->direction == 'rx' ? $l->rx_fport() : $l->tx_fport());
             if (isset( $struct[ $this->fport ] )) {
                 $this->hex = $hex = self::ascii2hex( $data, 'MSB' );
@@ -120,8 +142,12 @@ class nascv
         }
 
         # if did not find structure, then try parse data by type
-        $func = $this->lib[ 'functions' ][ $this->type ];
-        if ($func == '') {
+        if (isset( $this->lib[ 'functions' ][ $this->type ] )) {
+            $func = $this->lib[ 'functions' ][ $this->type ];
+            if ($func == '') {
+                return $this->data = $data;
+            }
+        } else {
             return $this->data = $data;
         }
         return $this->data = $this->$func( $data, $this->byte );
@@ -191,6 +217,8 @@ class nascv
                         if (!is_array( $k ) and $k == '_struct' and is_array( $v )) {
                             unset( $v[ '_struct' ][ 0 ] );
                             if (is_array( $v ) and count( $v ) > 0) {
+                                if (isset( $v[ 0 ][ 'packet_type' ] ))
+                                    unset( $v[ 0 ][ 'packet_type' ] );
                                 $object_r = array_merge_recursive( $object_r, $this->parser_hex( $hex, $v, true ) );
                             }
                         } else {
@@ -210,18 +238,15 @@ class nascv
                                     if (self::control_values( $v[ 'when' ], $_id )) {
                                         $show_object = true;
                                     } else {
-
                                         $previous_hex = $hex;
+                                        break;
                                     }
                                 }
                                 if (isset( $v[ 'formatter' ] )) {
                                     $struct_formatter = $v[ 'formatter' ];
                                 }
-
                             } else {
-
                                 if ($show_object) {
-
                                     $length = (isset( $v[ 'length' ] ) ? $v[ 'length' ] : 1);
                                     if (is_array( $length )) {
                                         $length = hexdec( self::find_attr( $length, 'value', $_id ) );
@@ -235,7 +260,9 @@ class nascv
                                             $data = $this->parsering( $data, $v, $_id );
                                             if ($data != NULL) {
                                                 if ($k != '') {
-                                                    $object_r[ $k ] = $data;
+                                                    if (!isset( $v[ 'hidden' ] ) or (isset( $v[ 'hidden' ] ) and $v[ 'hidden' ] != true))
+                                                        $object_r[ $k ] = $data;
+                                                    $this->obj[ $_id ][ '_' ][ $k ] = $data;
                                                 }
                                             }
                                         }
@@ -251,10 +278,12 @@ class nascv
 
                                                 if ($k != '') {
                                                     if (is_numeric( $k )) {
-                                                        $object_r[] = $data;
+                                                        if (!isset( $v[ 'hidden' ] ) or (isset( $v[ 'hidden' ] ) and $v[ 'hidden' ] != true))
+                                                            $object_r[] = $data;
                                                         $this->obj[ $_id ][ '_' ][] = $data;
                                                     } else {
-                                                        $object_r[ $k ] = $data;
+                                                        if (!isset( $v[ 'hidden' ] ) or (isset( $v[ 'hidden' ] ) and $v[ 'hidden' ] != true))
+                                                            $object_r[ $k ] = $data;
                                                         $this->obj[ $_id ][ '_' ][ $k ] = $data;
                                                     }
                                                 }
@@ -262,9 +291,11 @@ class nascv
                                         } else {
                                             if (!is_array( $v )) {
                                                 if (is_numeric( $k )) {
-                                                    $object_r[] = $v;
+                                                    if (!isset( $v[ 'hidden' ] ) or (isset( $v[ 'hidden' ] ) and $v[ 'hidden' ] != true))
+                                                        $object_r[] = $v;
                                                 } else {
-                                                    $object_r[ $k ] = $v;
+                                                    if (!isset( $v[ 'hidden' ] ) or (isset( $v[ 'hidden' ] ) and $v[ 'hidden' ] != true))
+                                                        $object_r[ $k ] = $v;
                                                     $this->obj[ $_id ][ '_' ][ $k ] = $v;
                                                 }
                                             }
@@ -276,7 +307,6 @@ class nascv
                     }
                 }
             }
-
             if ($show_object) {
                 if (isset( $object[ '_cnf' ] ) and isset( $object[ '_cnf' ][ 'name' ] )) {
                     $array = false;
@@ -296,6 +326,11 @@ class nascv
                             $f_key = array_values( array_slice( explode( ':', $sf_v ), -1 ) )[ 0 ];
                             $this->obj[ $_id ][ '_' ][ $f_key ] = $val;
                         }
+
+                        if (strstr( $new_value, 'Math(' )) {
+                            $new_value = self::Math( $new_value );
+                        }
+
                         $object_r = $new_value;
                     }
 
@@ -331,6 +366,33 @@ class nascv
         return $return;
     }
 
+    /**
+     * @param $str
+     * @return mixed
+     */
+    function Math( $str )
+    {
+        preg_match_all( '/Math\(([^)]+)\)/m', $str, $matches, PREG_SET_ORDER, 0 );
+        $math = $matches[ 0 ][ 1 ];
+        if (preg_match( '/(\d+)(?:\s*)([\+\-\*\/])(?:\s*)(\d+)/', $math, $matches ) !== FALSE) {
+            print_r( $matches );
+            switch ($matches[ 2 ]) {
+                case '+':
+                    return $matches[ 1 ] + $matches[ 3 ];
+                    break;
+                case '-':
+                    return $matches[ 1 ] - $matches[ 3 ];
+                    break;
+                case '*':
+                    return $matches[ 1 ] * $matches[ 3 ];
+                    break;
+                case '/':
+                    return $matches[ 1 ] / $matches[ 3 ];
+                    break;
+            }
+        }
+        return $math;
+    }
 
     /**
      * Control values and return boolean (IF function)
@@ -355,7 +417,32 @@ class nascv
                     $_key = explode( ':', $_or_key );
                     for ($i = 0; $i < count( $_key ); $i++) {
                         $key = $_key[ $i ];
-                        if (isset( $this->obj[ $_id ][ '_' ][ $key ] )) {
+                        if (count( $_key ) > 1) {
+                            if (isset( $this->obj[ $_id ] )) {
+                                $root = $this->obj[ $_id ];
+                                foreach ($_key as $_key_name) {
+                                    if (isset( $root[ $_key_name ] )) {
+                                        $root = $root[ $_key_name ];
+                                        if (isset( $root[ 'value' ] )) {
+                                            $find = $root;
+                                        }
+                                    }
+                                }
+                                if ($find == '') {
+                                    if (isset( $this->obj[ $_id ][ '_' ] )) {
+                                        $root = $this->obj[ $_id ][ '_' ];
+                                        foreach ($_key as $_key_name) {
+                                            if (isset( $root[ $_key_name ] )) {
+                                                $root = $root[ $_key_name ];
+                                                if (isset( $root[ 'value' ] )) {
+                                                    $find = $root;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } elseif (isset( $this->obj[ $_id ][ '_' ][ $key ] )) {
                             $find = $this->obj[ $_id ][ '_' ][ $key ];
                         } else {
                             if (is_array( $find )) {
@@ -442,10 +529,18 @@ class nascv
                                     $val = bindec( $val );
                                 }
                             }
+
+                            if (isset( $byte_obj[ 'converter' ] )) {
+                                $val = self::value_converter( $val, $byte_obj[ 'converter' ] );
+                            }
+
+                            if (is_numeric( $val )) $val = (int)$val;
                             $r[ $byte_obj[ 'parameter' ] ] = array( 'value' => $val );
                             if (isset( $byte_obj[ 'formatter' ] )) {
                                 $f = $byte_obj[ 'formatter' ];
-                                if (isset( $f[ 0 ][ 'value' ] )) {
+                                if (!is_array( $f ) and strstr( $f, '%' )) {
+                                    $r[ $byte_obj[ 'parameter' ] ][ 'formatted' ] = sprintf( $f, $val, $byte_obj[ 'unit' ] );
+                                } elseif (isset( $f[ 0 ][ 'value' ] )) {
                                     $form = '';
                                     foreach ($f as $forms) {
                                         if ($forms[ 'value' ] == '?' or $forms[ 'value' ] == '*') {
@@ -487,14 +582,13 @@ class nascv
                 and $this->byte != 'LSB') {
                 $data = self::byte_order_reverse( $data );
             }
-
             if (strstr( $v[ 'type' ], 'uint' )) {
                 $data = $this->hex2dec( $data, $this->byte );
             } elseif (strstr( $v[ 'type' ], 'int' )) {
                 $data = $this->hex2dec( $data, $this->byte, true );
             } elseif (strstr( $v[ 'type' ], 'float' )) {
                 $data = $this->hex2float( $data, $this->byte );
-            } elseif (strstr( $v[ 'type' ], 'hex' )) {
+            } elseif ($v[ 'type' ] == 'hex') {
                 if ($this->byte == 'LSB' and !isset( $v[ 'byte_order' ] )) {
                     $data = self::byte_order_reverse( $data );
                 }
@@ -504,15 +598,30 @@ class nascv
                     $options = array();
                     foreach ($ext_opt[ 1 ] as $k => $v) {
                         if (substr( $v, 0, 1 ) == '{' and substr( $v, -1 ) == '}') {
-                            $options[ $k ] = self::find_attr( array( str_replace( '}', '', str_replace( '{', '', $v ) ) ), 'value', $_id );
+                            $find = str_replace( '}', '', str_replace( '{', '', $v ) );
+                            $spec = 'value';
+                            $find = explode( '>', $find );
+                            if (isset( $find[ 1 ] )) {
+                                $spec = $find[ 1 ];
+                            }
+                            $options[ $k ] = self::find_attr( array( $find[ 0 ] ), $spec, $_id );
                         } else {
                             $options[ $k ] = $v;
                         }
                     }
-                    $ext->convert( $data, $options );
-                    return $ext->results;
+                    if ($this->encrypt_key != '') {
+                        $options[ 'encrypt_key' ] = $this->encrypt_key;
+                    }
+                    if (method_exists( $ext, 'convert' )) {
+                        $ext->convert( $data, $options );
+                        return $ext->results;
+                    } else {
+                        return $data;
+                    }
                 }
                 if (!isset( $v[ 'formatter' ] )) return $data;
+            } elseif ($v[ 'type' ] == 'text') {
+                return $this->hex2ascii( $data );
             }
 
             #converting
@@ -547,11 +656,27 @@ class nascv
                 $return[ 'unit' ] = 'n/a';
             }
             #formatting
+
+            if (isset( $v[ 'formatter' ] ) and !is_array( $v[ 'formatter' ] ) and substr( $v[ 'formatter' ], 0, 1 ) == '{' and substr( $v[ 'formatter' ], -1 ) == '}') {
+                $formatter = self::find_unit(
+                    array( str_replace( '}', '', str_replace( '{', '', $v[ 'formatter' ] ) ) ), $_id
+                );
+                if (!is_array( $formatter ) and !empty( $formatter )) {
+                    $v[ 'formatter' ] = $formatter;
+                }
+            }
+
             if (isset( $v[ 'formatter' ] ) and is_array( $v[ 'formatter' ] )) {
                 foreach ($v[ 'formatter' ] as $f_k => $f_v) {
+                    //formatter converter
+                    if (isset( $f_v[ 'converter' ] )) {
+                        $return[ 'value' ] = self::value_converter( $return[ 'value' ], $f_v[ 'converter' ] );
+                    }
+                    //formatter sprintf
                     if ($f_v[ 'value' ] == '?' or $f_v[ 'value' ] == '*') {
                         $return[ 'formatted' ] = sprintf( $f_v[ 'name' ], $return[ 'value' ], $return[ 'unit' ] );
                     }
+                    // make changes
                     if ($f_v[ 'value' ] == $return[ 'value' ]) {
                         $return[ 'formatted' ] = $f_v[ 'name' ];
                         foreach ($f_v as $fvk => $fvv) {
@@ -572,6 +697,18 @@ class nascv
                         $return[ 'formatted' ] = $return[ 'value' ] . ' ' . $return[ 'unit' ];
                     }
 
+                    if ($function[ 1 ] == 'wmbus_manufacturer') {
+                        $return[ 'value_raw' ] = $return[ 'value' ];
+                        $return[ 'value' ] = self::wmbus_manufacturer( $return[ 'value' ] );
+                        $return[ 'formatted' ] = 'n/a';
+                        foreach (json_decode( $v[ 'formatter_library' ], true ) as $kk => $vv) {
+                            if ($vv[ 'id' ] == $return[ 'value' ]) {
+                                $return[ 'formatted' ] = $vv[ 'manufacturer' ] . ' (' . $vv[ 'id' ] . ')';
+                                break;
+                            }
+                        }
+                    }
+
                     if (substr( $function[ 1 ], 0, 5 ) == 'date(') {
                         preg_match_all( "/\((.+)\)/", $return[ 'formatted' ], $m );
                         $return[ 'value_raw' ] = $return[ 'value' ];
@@ -581,12 +718,17 @@ class nascv
 
                     if (substr( $function[ 1 ], 0, 6 ) == 'date10') {
                         preg_match_all( "/\((.+)\)/", $return[ 'formatted' ], $m );
-                        $value = $return[ 'value' ] * 10 * 60;
                         $return[ 'value_raw' ] = $return[ 'value' ];
-                        $return[ 'value' ] = gmdate( $m[ 1 ][ 0 ], $value );
-                        $return[ 'formatted' ] = $return[ 'value' ] . ' ' . $return[ 'unit' ];
-                    }
 
+                        if ($return[ 'value' ] >= 255) {
+                            $return[ 'value' ] = 'Live';
+                            $return[ 'formatted' ] = $return[ 'value' ];
+                        } else {
+                            $value = $return[ 'value' ] * 10 * 60;
+                            $return[ 'value' ] = gmdate( $m[ 1 ][ 0 ], $value );
+                            $return[ 'formatted' ] = $return[ 'value' ] . ' ' . $return[ 'unit' ];
+                        }
+                    }
                 }
             }
             return $return;
@@ -656,7 +798,7 @@ class nascv
                         $find = (isset( $this->obj[ $_id ][ $key ] ) ? $this->obj[ $_id ][ $key ] : '');
                     }
                 }
-                if (isset( $find[ $attr ] )) {
+                if ($attr !== false and isset( $find[ $attr ] )) {
                     $find = $find[ $attr ];
                 }
             }
@@ -729,7 +871,7 @@ class nascv
         } elseif (strstr( $type, 'byte' )) {
             $bite = substr( $hex, 0, $length * 2 );
             $hex = substr( $hex, $length * 2 );
-        } elseif (strstr( $type, 'hex' )) {
+        } elseif (in_array( $type, array( 'hex', 'text' ) )) {
             $bite = substr( $hex, 0, $length * 2 );
             $hex = substr( $hex, $length * 2 );
         }
@@ -741,7 +883,7 @@ class nascv
      * Call library
      * @param $library
      * @param bool $bool
-     * @return bool
+     * @return bool | object
      */
     public
 
@@ -757,11 +899,10 @@ class nascv
                 $this->$library->nascv = $this;
                 return $this->$library;
             } else {
-                die( 'Library "' . $library . '" class is not finded' );
+                return false;
             }
         } else {
-            if ($bool) return false;
-            die( 'Did not find library: ' . $library );
+            return false;
         }
     }
 
@@ -779,12 +920,16 @@ class nascv
             if (isset( $obj[ 'hex' ] )) {
                 if ($obj[ 'hex' ] == substr( $str, 0, 2 ) . '0' . substr( $str, 3, 1 ) or $lib == strtoupper( $str )) {
                     $this->product = $lib;
+                    $this->product_name = $obj[ 'name' ];
+                    $this->product_upn = $obj[ 'upn' ];
                     return strtolower( $lib );
                 }
             } else {
                 foreach ($obj as $k => $v) {
                     if ($v[ 'hex' ] == substr( $str, 0, 2 ) . '0' . substr( $str, 3, 1 ) or $lib == strtoupper( $str )) {
                         $this->product = $lib;
+                        $this->product_name = $v[ 'name' ];
+                        $this->product_upn = $v[ 'upn' ];
                         return strtolower( $lib );
                     }
                 }
@@ -927,22 +1072,18 @@ class nascv
             $HIGH = 254;
             $MED = 247;
             $LOW = 18;
-            $low_i = max( 0, $LOW - $offset );
-            $med_i = max( 0, $MED - $offset - $low_i );
-            $high_i = max( 0, $HIGH - $offset - $low_i - max( 0, ($MED - $offset - $low_i) ) );
-            return $start_value - $high_i * 0.05 - $med_i * 0.004 - $low_i * 0.05;
         } else if ($nominal_v == '3.0') {
             $start_value = 3.6;
             $HIGH = 254;
             $MED = 245;
             $LOW = 16;
-            $low_i = max( 0, $LOW - $offset );
-            $med_i = max( 0, $MED - $offset - $low_i );
-            $high_i = max( 0, $HIGH - $offset - $low_i - max( 0, ($MED - $offset - $low_i) ) );
-            return $start_value - $high_i * 0.05 - $med_i * 0.004 - $low_i * 0.05;
         } else {
             return 'invalid battery chemistry';
         }
+        $low_i = max( 0, $LOW - $offset );
+        $med_i = max( 0, $MED - $offset - $low_i );
+        $high_i = max( 0, $HIGH - $offset - $low_i - max( 0, ($MED - $offset - $low_i) ) );
+        return $start_value - $high_i * 0.05 - $med_i * 0.004 - $low_i * 0.05;
     }
 
     /**
@@ -970,6 +1111,27 @@ class nascv
 
 
 ## CONVERTERS
+
+
+    /**
+     * WMBUS Manufacturer converter
+     * @param $man_id
+     * @return string
+     */
+    private
+
+    function wmbus_manufacturer( $man_id )
+    {
+        $id = 0x00;
+        $man_id = str_split( $man_id, 2 );
+        $id |= (hexdec( $man_id[ 1 ] ) << 0);
+        $id |= (hexdec( $man_id[ 0 ] ) << 8);
+        return
+            chr( ($id >> 10) + 64 ) .
+            chr( ($id >> 5 & 0x001F) + 64 ) .
+            chr( ($id & 0x001F) + 64 );
+    }
+
 
     /**
      * byte order reversed
@@ -1013,9 +1175,9 @@ class nascv
 
 
     /**
-     * str to json conversion
-     * @param string $str
-     * @return string reversed str
+     * @param $str
+     * @param string $byte_order
+     * @return false|string
      */
     public
 
@@ -1026,12 +1188,11 @@ class nascv
 
 
     /**
-     * dec to hex conversion
-     * @param string $dec
+     * @param $dec
+     * @param string $byte_order
      * @return string
      */
     public
-
     function dec2hex( $dec, $byte_order = 'MSB' )
     {
         $hex = dechex( $dec );
@@ -1248,6 +1409,23 @@ class nascv
             $hex = self::byte_order_reverse( $hex );
             return @unpack( "f", pack( 'H*', $hex ) )[ 1 ];
         }
+    }
+
+
+    /**
+     * @param $hex
+     * @return string
+     */
+    function hex2ascii( $hex, $byte_order = 'LSB' )
+    {
+        if ($byte_order == 'MSB') {
+            $hex = self::byte_order_reverse( $hex );
+        }
+        $string = '';
+        for ($i = 0; $i < strlen( $hex ) - 1; $i += 2) {
+            $string .= chr( hexdec( $hex[ $i ] . $hex[ $i + 1 ] ) );
+        }
+        return $string;
     }
 
 
@@ -1579,14 +1757,24 @@ class nascv
                             // MAIN
                             if (isset( $v[ 'formatted' ] )) {
                                 $value = null;
-                                if (in_array( $v[ 'formatted' ], array( 'E1', 'E1-E2' ) )) {
+                                if (in_array( $v[ 'formatted' ], array( 'E1', 'E1-E2', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7' ) )) {
+                                    $medium_type_c = 'heat';
+                                    if ($v[ 'formatted' ] == 'E3') {
+                                        $medium_type_c = 'cooling';
+                                    }
+                                    if (in_array( $v[ 'formatted' ], array( 'E4', 'E5' ) )) {
+                                        $medium_type_c = 'flow';
+                                    }
+                                    if ($v[ 'formatted' ] == 'E6') {
+                                        $medium_type_c = 'water';
+                                    }
                                     if (!empty( $uv[ 'register_value' ][ 'value' ] )) {
                                         if (empty( $r[ 'main' ] )) {
                                             $returnChannels[ $c ] = array(
                                                 'name' => !empty( $v[ 'description' ] ) ? $v[ 'description' ] : $v[ 'formatted' ],
                                                 'value' => $register_value[ 'value' ],
                                                 'unit' => $register_value[ 'unit' ],
-                                                'medium_type' => 'heat'
+                                                'medium_type' => $medium_type_c
                                             );
                                         }
                                     }
@@ -1821,7 +2009,4 @@ class nascv
         $html = $lib;
         return $html;
     }
-
 }
-
-?>

@@ -7,7 +7,7 @@ class other {
      * @return array
      */
 	function rx_fport() {
-		$struct = array();
+		$struct = [];
 
 		return $struct;
 	}

@@ -1,6 +1,6 @@
 <?php
 
-class lgm
+class aem
 {
 
     public $nascv;
@@ -12,12 +12,28 @@ class lgm
 
         # fport 24
         $struct[ 24 ] = [
-
             #packet type
             [ 'packet_type' => 'status_packet' ],
-
-
         ];
+
+        $struct[ 24 ][ 'header' ] = [
+
+            #main
+            [ '_cnf' => [ 'repeat' => false ],
+                'metering_data' => [ 'type' => 'uint32', 'unit' => 'L', 'formatter' => [
+                    [ 'value' => 4294967295, 'name' => 'n/a' ],
+                    [ 'value' => '*', 'name' => '%s %s' ]
+                ] ],
+                'battery' => [ 'type' => 'uint8', 'formatter' => ':battery:3.6' ],
+                'temperature' => [ 'type' => 'int8', 'unit' => '°C', 'formatter' => '%s%s' ],
+                'rssi' => [ 'type' => 'int8', 'unit' => 'dBm' ],
+            ],
+        ];
+
+        
+
+        
+
 
         # fport 25
         $struct[ 25 ] = [
@@ -25,17 +41,23 @@ class lgm
             #packet type
             [ 'packet_type' => 'usage_packet' ],
 
-            [ '_cnf' => [ 'repeat' => 3, ],
-                'mesuring_time' => [ 'type' => 'uint8' ],
-                'metering_data' => [ 'type' => 'uint32', 'unit'=>'L' ],
-            ],
-
-            [ '_cnf' => [ 'repeat' => false, ],
-                'elster_meter_id' => [ 'type' => 'hex', 'length'=>4 ],
-            ],
-
+            #main
+            [ '_cnf' => [ 'repeat' => false ],
+                'counter' => [ 'type' => 'uint32','unit' => 'L']
+            ]
         ];
 
+        # fport 50
+        $struct[ 50 ] = [
+
+            #packet type
+            [ 'packet_type' => 'configuration_packet' ],
+
+            #main
+            [ '_cnf' => [ 'repeat' => false ],
+
+            ]
+        ];
 
         # fport 99
         $struct[ 99 ] = [
@@ -58,8 +80,8 @@ class lgm
                     'minor' => [ 'type' => 'uint8' ],
                     'patch' => [ 'type' => 'uint8' ],
                 ],
-                'card_count' => [ 'type' => 'uint16' ],
-                'switch_direction' => [ 'type' => 'hex' ]
+                'reset_reason' => [ 'type' => 'byte', 'bits' => [ 'RFU', 'watchdog_reset', 'soft_reset', 'RFU', 'magnet_wakeup', 'RFU', 'RFU', 'nfc_wakeup' ] ]
+                
             ],
 
 
@@ -71,11 +93,13 @@ class lgm
                     [ 'value' => '31', 'name' => 'magnet_shutdown' ],
                     [ 'value' => '32', 'name' => 'entering_dfu' ],
                 ] ],
-                [ '_struct' => $struct[ 24 ] ]
+                '_struct' => $struct[ 24 ],
             ],
-
         ];
-
+        
+        if ($this->nascv->firmware >= 1.0) {
+            include 'components/ukw.php';
+        }
 
         return $struct;
     }
@@ -88,7 +112,4 @@ class lgm
         $tx = self::rx_fport();
         return $tx;
     }
-
 }
-
-?>

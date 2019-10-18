@@ -1,4 +1,4 @@
-# NASCV
+# NASCV `v8.1`
 
 NAS Converter for IoT Systems
 
@@ -7,7 +7,7 @@ NAS Converter for IoT Systems
 
 ### Installation
 
-NASCV requires [PHP](http://php.net/) V5.6.3+
+NASCV requires [PHP](http://php.net/) V7.0+
 
 ```sh
 $cv = new nascv;
@@ -30,6 +30,7 @@ see example.php
 
 | Code | Products |
 | ------ | ------ |
+| AEM | CM3011, CM3110, CM3120 |
 | AXI | IM307x |
 | GM1 | CM3060 |
 | KLM | IM3060, IM3080, IM310x |
@@ -97,6 +98,7 @@ $str = $cv->ascii2dec($str); #converting ascii to dec
 
 # string to ...
 $str = $cv->str2bin($str); #converting string to binary
+$str = $cv->str2json($str); #converting string to json
 $str = $cv->string2ascii($str); #converting string to ascii
 
 # bin to ...
@@ -157,6 +159,8 @@ echo $cv->description;
 echo $cv->direction;
 echo $cv->fport;
 echo $cv->product; #shows product type (LCU, WMR, MLM, etc)
+echo $cv->product_name; #shows product name (Luminaire Controller Bare, etc)
+echo $cv->product_upn; #shows product upn (UL2002, CM3040, etc)
 echo $cv->rawdata; #shows rawdata in base64
 ```
 
@@ -165,4 +169,13 @@ echo $cv->rawdata; #shows rawdata in base64
 $cv->showHex = true; # default is true
 $cv->direction = 'rx'; #rx or tx (rx is default)
 $cv->firmware = ''; // can also be set in $cv->data($data)
+$cv->firmware_patch = ''; // can also be set in $cv->data($data)
+$cv->encrypt_key = ''; // can also be set in $cv->data($data)
+```
+
+### WM-BUS Decrypting
+To decrypt WML payload you have to send encrypt key with other datas.
+```sh
+$msg = array('data'=>'{base64_data}', 'fport'=>25, 'serial'=>'{product_serial}', 'encrypt_key'=>'01020304050607080911121314151617')
+$data = $cv->data($msg);
 ```

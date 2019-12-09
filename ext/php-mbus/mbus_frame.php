@@ -401,9 +401,9 @@ class mbus_frame {
         }
         catch(EndOfBufferExeption $e)
         {
-            $this->results_datarec['hex'] = "";
+            $this->results_datarec['_hex'] = "";
             foreach ($data_frame as $byte)
-                $this->results_datarec['hex'] .= mbus_utils::ByteToHex($byte);
+                $this->results_datarec['_hex'] .= mbus_utils::ByteToHex($byte);
 
             $this->results_datarec['error'] = "".$e->getMessage();
         }
@@ -413,6 +413,45 @@ class mbus_frame {
 
         #        $this->mbus_frame_configured = true;
         return $parse_success;
+    }
+
+    public function parse_decrypted_payload($data, $control_information_hex, $data_payload_optional_raw="")
+    {
+        $data_frame = mbus_utils::byteStr2byteArray($data);
+        $payload = $data_frame;        
+        $payload_crc = array_slice($data_frame, 1);
+        $control_information = hex2bin($control_information_hex);
+        print_r($control_information);
+        print_r($control_information_hex);
+/*
+        if($control_information == 0x8d) // grab extended link layer part
+        {
+            print("Extended Link Layer II");
+            $payload_crc = array_slice($data_frame, 7, 2);
+            print_r($payload_crc);
+            $control_information = $data_frame[9];
+            $payload = array_slice($data_frame, 10);
+        }
+*/
+        if($control_information == 0x78) {      
+            
+        }
+
+        // just for logging
+        for($j = 0; $j < sizeof($payload); $j++){
+            print(mbus_utils::ByteToHex($payload[$j]));
+        }
+
+        if($control_information == 0x78) {
+            return $this->parse_payload_variable_internal($payload, false, $data_payload_optional_raw);
+        }
+        else if($control_information == 0x79) {
+            $this->results['error'] = "Compact frame parsing not supported.";
+            return false;
+        }
+
+        $this->results['error'] = "Unknown packet.";
+        return false;
     }
 
     /**
@@ -686,6 +725,7 @@ class mbus_frame {
         $data_len = count($data_frame);
 
         $results_top = &$this->results_datarec;
+        $header_raw_keyword = $is_headers_only ? "header_raw" : "_header_raw";
 
         if($data_len == 0)
         {
@@ -736,12 +776,17 @@ class mbus_frame {
                 } else {
                     $this_record["value_type"] = "manufacturer data";
                 }
+                $this_record[$header_raw_keyword] = mbus_utils::ByteToHex($dif);
 
                 mbus_frame::incr_buf($i, $data_len);
                 // Just copy the remaining data as it is vendor specific
                 while ($i < $data_len) {
-//                    $this_record['_data_raw'] .= mbus_utils::ByteToHex($data_frame[$i]);
-                    $this_record['value'] .= mbus_utils::ByteToHex($data_frame[$i]);
+                    $hex = mbus_utils::ByteToHex($data_frame[$i]);
+                    if(!isset($this_record["value"])) {
+                        $this_record["value"] = $hex;
+                    } else {
+                        $this_record["value"] .= $hex;
+                    }
 #                    mbus_frame::incr_buf($i, $data_len);
                     $i++; // Increment byte pointer. not using incr_buf because it has to end at some point without exception
                 }
@@ -818,7 +863,7 @@ class mbus_frame {
 
                 $the_unit = mbus_utils::data_str_decode($plain_text_data);
                 $this_record["value_type"] = "plain text unit: ".$the_unit;
-                $this_record["unit"] = $the_unit;
+                $this_record["_unit"] = $the_unit;
             }
 
             // format vif function (min, max, during error) to beginning of value_type
@@ -846,7 +891,8 @@ class mbus_frame {
                 if($lvar <= 0xBF) { // Variable ASCII string
                     $record_data_len = $data_frame[$i];
                     // Note that 0x0A is a newline ascii character and it seems to be after the characters but not included in the length!
-                    if ($data_frame[$i + $record_data_len] == 0x0A) {
+                    $temp_len = $i + $record_data_len;
+                    if ((sizeof($data_frame) > $temp_len) && $data_frame[$temp_len] == 0x0A) {
                         $record_data_len += 1;
                     }
                     $this_record['_encoding'] = 'variable ASCII string';
@@ -868,13 +914,15 @@ class mbus_frame {
             // copy header buffer
             $header_end = $i;
 
+            $this_record[$header_raw_keyword] = "";
             for ($j = $start_byte_pos; $j <= $header_end; $j++) {
-                @$this_record['_header_raw'] .= mbus_utils::ByteToHex($data_frame[$j]);
+                $this_record[$header_raw_keyword] .= mbus_utils::ByteToHex($data_frame[$j]);
             }
 
+/*            $raw_header_byte = mbus_utils::ByteToHex($data_frame[$i]);
             if( !array_key_exists("value_type", $this_record))
                 $this_record['value_type'] = 'unknown value type';
-
+*/
             // if payload consists only of headers, skip data part treatment
             if($is_headers_only)
             {
@@ -889,28 +937,29 @@ class mbus_frame {
                 static $i_data = 0;
                 if (count($data_payload_optional) < ($i_data + $record_data_len))
                     throw new EndOfBufferExeption('Secondary buffer too short');
-
+                $this_record['_data_raw'] = "";
                 for ($j = 0; $j < $record_data_len; $j++) {
                     $data_raw[] = @$data_payload_optional[$i_data];
-                    @$this_record['_data_raw'] .= mbus_utils::ByteToHex($data_payload_optional[$i_data]);
+                    $this_record['_data_raw'] .= mbus_utils::ByteToHex($data_payload_optional[$i_data]);
                     $i_data++;
                 }
             }
             else // regular case, where data is in the same buffer with headers
             {
+                $this_record['_data_raw'] = "";
                 for ($j = 0; $j < $record_data_len; $j++) {
                     mbus_frame::incr_buf($i, $data_len);
                     $data_raw[] = @$data_frame[$i];
-                    @$this_record['_data_raw'] .= mbus_utils::ByteToHex($data_frame[$i]);
+                    $this_record['_data_raw'] .= mbus_utils::ByteToHex($data_frame[$i]);
                 }
             }
 
             @$this_record['value'] = mbus_utils::getValue($dif, $vif, $data_raw, $is_date_time);
 
             // Apply exponent to the value
+            $this_record['_value_raw'] = $this_record['value'];
             if(array_key_exists("_exp", $this_record) and is_numeric($this_record['value']) and ($this_record['_exp'] != 0))
             {
-                $this_record['_value_raw'] = $this_record['value'];
                 $exp = $this_record['_exp'];
                 $multiplier = 1;
                 for($ec = 0; $ec < abs($exp); $ec++){
@@ -924,6 +973,21 @@ class mbus_frame {
                     $this_record['value'] *= $multiplier;
                 }
             }
+
+            $this_record['formatted'] = strval($this_record['value']);
+            if(array_key_exists("_unit", $this_record)) {
+                $this_record['formatted'] .= $this_record['_unit'];
+            }
+
+            // test if this helps all int's and floats not to be converted to string
+            if (is_numeric( $this_record['value'] )) {
+                if (is_float( $this_record['value'] + 0 )) {
+                    $this_record['value'] = (float)$this_record['value'];
+                } else {
+                    $this_record['value'] = (int)$this_record['value'];
+                }
+            }
+
             $i++; // set the index ready for next data_record
         }
         return true;

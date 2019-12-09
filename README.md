@@ -1,4 +1,4 @@
-# NASCV `v8.1`
+# NASCV `v8.4`
 
 NAS Converter for IoT Systems
 
@@ -121,8 +121,10 @@ $cv->getProducts() # $msg['appEUI'] required - shows product type (LCU, WMR, MLM
 $cv->addZero($nr [, $range = 2, $left = true, $char = "0" ]) # adding characters before or after $str
 $cv->call_library( 'library_name' ) # possible to call library
 $cv->call_library($cv->product)->rx_fport()[$cv->fport] ) # current used library structure
+$cv->find_library('library_code') # will set $cv->product, $cv->product_name and $cv->product_upn
+$cv->wmbus_manufacturer("ID|Hex") # returns the opposite of ID or Hex
 $cv->toHTML() # put data to nice HTML view
-$cv->toMetering() # find metering data and give pack restructured array
+$cv->metering($data) # formatting data to capability structure
 ```
 
 ### $cv->toHTML() example
@@ -132,12 +134,68 @@ $data = $cv->data($msg);
 echo $cv->toHTML($data);
 ```
 
-### $cv->toMetering() example
+
+
+### $cv->metering() example (New)
+
+```sh
+$data = $cv->data($msg);
+print_r($cv->metering($data));
+```
+
+Result example:
+```sh
+{
+    "data": {
+        "accumulated_volume": {
+            "value": 3,
+            "unit": "L",
+            "formatted": "3 L"
+        }
+    },
+    "configuration": {
+        "fixed_metering_enabled": {
+            "value": 0,
+            "formatted": "disabled"
+        }
+    },
+    "event": {
+        "tamper_alert": {
+            "value": 0,
+            "formatted": "false"
+        },
+        "temperature_alert": {
+            "value": 0,
+            "formatted": "false"
+        },
+        "battery_alert": {
+            "value": 0,
+            "formatted": "false"
+        },
+        "reverse_flow_alert": {
+            "value": 0,
+            "formatted": "false"
+        },
+        "leak_alert": {
+            "value": 0,
+            "formatted": "false"
+        },
+        "burst_alert": {
+            "value": 0,
+            "formatted": "false"
+        }
+    }
+}
+```
+
+### $cv->toMetering() example (Deprecated)
 
 ```sh
 $data = $cv->data($msg);
 print_r($cv->toMetering($data));
 ```
+
+This will be deleted in next version
 
 ### Advanced
 

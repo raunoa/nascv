@@ -11,42 +11,42 @@ class mlm
         $struct = array();
 
         # fport 24
-        $struct[24] = array(
+        $struct[ 24 ] = array(
 
             #packet type
-            array('packet_type' => 'status_packet'),
+            array( 'packet_type' => 'status_packet' ),
 
             #main
-            array('_cnf' => array('repeat' => false),
-                'metering_data' => array('type' => 'uint32', 'unit' => 'L'),
-                'battery' => array('type' => 'uint8', 'formatter' => ':battery:3.0'),
-                'temperature' => array('type' => 'int8', 'unit' => '°C', 'formatter' => '%s%s'),
-                'rssi' => array('type' => 'int8', 'unit' => 'dBm'),
-                'mode' => array('type' => 'byte'),
-                'alerts' => array('type' => 'byte'),
+            array( '_cnf' => array( 'repeat' => false ),
+                'metering_data' => array( 'type' => 'uint32', 'unit' => 'L' ),
+                'battery' => array( 'type' => 'uint8', 'formatter' => ':battery:3.0' ),
+                'temperature' => array( 'type' => 'int8', 'unit' => '°C', 'formatter' => '%s%s' ),
+                'rssi' => array( 'type' => 'int8', 'unit' => 'dBm' ),
+                'mode' => array( 'type' => 'byte' ),
+                'alerts' => array( 'type' => 'byte' ),
             )
         );
 
         # fport 25
-        $struct[25] = array(
+        $struct[ 25 ] = array(
 
             #packet type
-            array('packet_type' => 'usage_packet'),
+            array( 'packet_type' => 'usage_packet' ),
 
             #main
-            array('_cnf' => array('repeat' => false),
+            array( '_cnf' => array( 'repeat' => false ),
 
             )
         );
 
         # fport 50
-        $struct[50] = array(
+        $struct[ 50 ] = array(
 
             #packet type
-            array('packet_type' => 'configuration_packet'),
+            array( 'packet_type' => 'configuration_packet' ),
 
             #main
-            array('_cnf' => array('repeat' => false),
+            array( '_cnf' => array( 'repeat' => false ),
 
             )
         );
@@ -73,7 +73,7 @@ class mlm
                     'patch' => array( 'type' => 'uint8' ),
                 ),
                 'reset_reason' => array( 'type' => 'byte', 'bits' => array( 'RFU', 'watchdog_reset', 'soft_reset', 'RFU', 'magnet_wakeup', 'RFU', 'RFU', 'nfc_wakeup' ) ),
-                'calibration_debug ' => array( 'type' => 'hex', 'length' => 8, 'byte_order'=>'LSB' ),
+                'calibration_debug ' => array( 'type' => 'hex', 'length' => 8, 'byte_order' => 'LSB' ),
             ),
 
 
@@ -101,5 +101,3 @@ class mlm
         return $tx;
     }
 }
-
-?>

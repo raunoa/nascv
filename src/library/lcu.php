@@ -234,7 +234,9 @@ class lcu
         $struct[ 50 ][ 'boot_delay_config_packet' ] = [ '_cnf' => [ 'repeat' => false, 'when' => [ [ 'packet_type' => 'boot_delay_config_packet' ] ] ],
             'boot_delay_range' => [ 'type' => 'uint8', 'unit' => 'seconds' ],
         ];
-
+        
+        
+         
 
         # fport 99
         $struct[ 99 ] = [

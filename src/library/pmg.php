@@ -1,154 +1,156 @@
 <?php
-class pmg {
 
-	public $nascv;
+class pmg
+{
 
-	# structure by fport
-	function rx_fport() {
-		$struct = [];
+    public $nascv;
 
-		# fport 24
-		$struct[ 24 ] = [
-			
-			#packet type
-			[ 'packet_type' => 'status_packet' ],
+    # structure by fport
+    function rx_fport()
+    {
+        $struct = [];
 
-			#main
-			[ '_cnf' => [ 'repeat' => false ],
-				'general' => [ 'type' => 'byte', 'bits' => [
-					'relay_state' => [ 'off', 'on' ],
-					'relay_switched_packet' => [ false, true ],
-					'counter_reset_packet' => [ false, true ]
-				] ],
-				'accumulated_energy' => [ 'type' => 'float', 'unit' => 'kWh', 'formatter' => '%.3f %s' ],
-				[ '_cnf' => [ 'repeat' => false, 'name' => 'instant'],
-					'frequency' => [ 'type' => 'uint16', 'unit' => 'Hz', 'converter' => '/1000' ],
-					'voltage' => [ 'type' => 'uint16', 'unit' => 'V', 'converter' => '/100' ],
-					'power' => [ 'type' => 'uint16', 'unit' => 'W', 'converter' => '/10' ],
-				],
-				'rssi' => [ 'type' => 'int8', 'unit' => 'dBm', 'converter' => '*-1' ],
-			],
+        # fport 24
+        $struct[ 24 ] = [
 
-			# Extension module data
-			[ '_cnf' => [ 'repeat' => true, 'name' => 'extension' ],
-				'device_type' => [ 'type' => 'hex' ],
+            #packet type
+            [ 'packet_type' => 'status_packet' ],
 
-				# swithc
-				[ '_cnf' => [ 'repeat' => false, 'name' => 'switch', 'when' => [ [ 'device_type' => '00' ] ] ],
-					'channel_map' => [ 'type' => 'byte', 'bits' => [
-						'channel_0' => [ 'off', 'on' ],
-						'channel_1' => [ 'off', 'on' ],
-						'channel_2' => [ 'off', 'on' ],
-						'channel_3' => [ 'off', 'on' ],
-						'channel_4' => [ 'off', 'on' ],
-						'channel_5' => [ 'off', 'on' ],
-						'channel_6' => [ 'off', 'on' ],
-						'channel_7' => [ 'off', 'on' ],
-					], ]
-				],
+            #main
+            [ '_cnf' => [ 'repeat' => false ],
+                'general' => [ 'type' => 'byte', 'bits' => [
+                    'relay_state' => [ 'off', 'on' ],
+                    'relay_switched_packet' => [ false, true ],
+                    'counter_reset_packet' => [ false, true ]
+                ] ],
+                'accumulated_energy' => [ 'type' => 'float', 'unit' => 'kWh', 'formatter' => '%.3f %s' ],
+                [ '_cnf' => [ 'repeat' => false, 'name' => 'instant' ],
+                    'frequency' => [ 'type' => 'uint16', 'unit' => 'Hz', 'converter' => '/1000' ],
+                    'voltage' => [ 'type' => 'uint16', 'unit' => 'V', 'converter' => '/100' ],
+                    'power' => [ 'type' => 'uint16', 'unit' => 'W', 'converter' => '/10' ],
+                ],
+                'rssi' => [ 'type' => 'int8', 'unit' => 'dBm', 'converter' => '*-1' ],
+            ],
 
-				# meter
-				[ '_cnf' => [ 'repeat' => false, 'name' => 'meter', 'when' => [ [ 'device_type' => '01' ] ] ],
-					'channel_map' => [ 'type' => 'byte', 'bits' => [
-						'channel_0' => [ 'diconnected', 'connected' ],
-						'channel_1' => [ 'diconnected', 'connected' ],
-						'channel_2' => [ 'diconnected', 'connected' ],
-						'channel_3' => [ 'diconnected', 'connected' ],
-						'channel_4' => [ 'diconnected', 'connected' ],
-						'channel_5' => [ 'diconnected', 'connected' ],
-						'channel_6' => [ 'diconnected', 'connected' ],
-						'channel_7' => [ 'diconnected', 'connected' ],
-					], ],
-					'channel_x' => [ 'type' => 'float', 'unit' => 'kWh' ],
-					'channel_n' => [ 'type' => 'float', 'unit' => 'kWh' ],
-				]
-			]
+            # Extension module data
+            [ '_cnf' => [ 'repeat' => true, 'name' => 'extension' ],
+                'device_type' => [ 'type' => 'hex' ],
 
-		];
+                # swithc
+                [ '_cnf' => [ 'repeat' => false, 'name' => 'switch', 'when' => [ [ 'device_type' => '00' ] ] ],
+                    'channel_map' => [ 'type' => 'byte', 'bits' => [
+                        'channel_0' => [ 'off', 'on' ],
+                        'channel_1' => [ 'off', 'on' ],
+                        'channel_2' => [ 'off', 'on' ],
+                        'channel_3' => [ 'off', 'on' ],
+                        'channel_4' => [ 'off', 'on' ],
+                        'channel_5' => [ 'off', 'on' ],
+                        'channel_6' => [ 'off', 'on' ],
+                        'channel_7' => [ 'off', 'on' ],
+                    ], ]
+                ],
+
+                # meter
+                [ '_cnf' => [ 'repeat' => false, 'name' => 'meter', 'when' => [ [ 'device_type' => '01' ] ] ],
+                    'channel_map' => [ 'type' => 'byte', 'bits' => [
+                        'channel_0' => [ 'diconnected', 'connected' ],
+                        'channel_1' => [ 'diconnected', 'connected' ],
+                        'channel_2' => [ 'diconnected', 'connected' ],
+                        'channel_3' => [ 'diconnected', 'connected' ],
+                        'channel_4' => [ 'diconnected', 'connected' ],
+                        'channel_5' => [ 'diconnected', 'connected' ],
+                        'channel_6' => [ 'diconnected', 'connected' ],
+                        'channel_7' => [ 'diconnected', 'connected' ],
+                    ], ],
+                    'channel_x' => [ 'type' => 'float', 'unit' => 'kWh' ],
+                    'channel_n' => [ 'type' => 'float', 'unit' => 'kWh' ],
+                ]
+            ]
+
+        ];
 
 
+        # fport 25
+        $struct[ 25 ] = [
 
-		# fport 25
-		$struct[ 25 ] = [
-			
-			#packet type
-			[ 'packet_type' => 'usage_packet' ],
+            #packet type
+            [ 'packet_type' => 'usage_packet' ],
 
-			#main
-			[ '_cnf' => [ 'repeat' => false ],
-				'accumulated_energy' => [ 'type' => 'float', 'unit' => 'kWh', 'formatter' => '%0.3f %s' ],
-				'power' => [ 'type' => 'uint16', 'unit' => 'W', 'converter' => '/10' ],
-			],
+            #main
+            [ '_cnf' => [ 'repeat' => false ],
+                'accumulated_energy' => [ 'type' => 'float', 'unit' => 'kWh', 'formatter' => '%0.3f %s' ],
+                'power' => [ 'type' => 'uint16', 'unit' => 'W', 'converter' => '/10' ],
+            ],
 
-			[ '_cnf' => [ 'repeat' => true, 'name' => 'extension' ],
-				'device_type' => [ 'type' => 'hex' ],
+            [ '_cnf' => [ 'repeat' => true, 'name' => 'extension' ],
+                'device_type' => [ 'type' => 'hex' ],
 
-				# meter
-				[ '_cnf' => [ 'repeat' => false, 'name' => 'meter', 'when' => [ [ 'device_type' => '01' ] ] ],
-					'channel_map' => [ 'type' => 'byte', 'bits' => [
-						'channel_0' => [ 'diconnected', 'connected' ],
-						'channel_1' => [ 'diconnected', 'connected' ],
-						'channel_2' => [ 'diconnected', 'connected' ],
-						'channel_3' => [ 'diconnected', 'connected' ],
-						'channel_4' => [ 'diconnected', 'connected' ],
-						'channel_5' => [ 'diconnected', 'connected' ],
-						'channel_6' => [ 'diconnected', 'connected' ],
-						'channel_7' => [ 'diconnected', 'connected' ],
-					], ],
-					'channel_x' => [ 'type' => 'float', 'unit' => 'kWh' ],
-					'channel_n' => [ 'type' => 'float', 'unit' => 'kWh' ],
-				]
-			]
+                # meter
+                [ '_cnf' => [ 'repeat' => false, 'name' => 'meter', 'when' => [ [ 'device_type' => '01' ] ] ],
+                    'channel_map' => [ 'type' => 'byte', 'bits' => [
+                        'channel_0' => [ 'diconnected', 'connected' ],
+                        'channel_1' => [ 'diconnected', 'connected' ],
+                        'channel_2' => [ 'diconnected', 'connected' ],
+                        'channel_3' => [ 'diconnected', 'connected' ],
+                        'channel_4' => [ 'diconnected', 'connected' ],
+                        'channel_5' => [ 'diconnected', 'connected' ],
+                        'channel_6' => [ 'diconnected', 'connected' ],
+                        'channel_7' => [ 'diconnected', 'connected' ],
+                    ], ],
+                    'channel_x' => [ 'type' => 'float', 'unit' => 'kWh' ],
+                    'channel_n' => [ 'type' => 'float', 'unit' => 'kWh' ],
+                ]
+            ]
 
-		];
+        ];
 
-		# fport 50
-		$struct[ 50 ] = [
-			
-			#packet type
-			[ 'packet_type' => 'configuration_packet' ],
+        # fport 50
+        $struct[ 50 ] = [
 
-			#main
-			[ '_cnf' => [ 'repeat' => false ],
-				'header' => [ 'type' => 'hex' ]
-			],
+            #packet type
+            [ 'packet_type' => 'configuration_packet' ],
 
-			#Reporting intervals
-			[ '_cnf' => [ 'repeat' => false, 'when' => [ [ 'header' => '00' ] ] ],
-				'usage_interval' => [ 'type' => 'uint16', 'unit' => 'minutes' ],
-				'status_interval' => [ 'type' => 'uint16', 'unit' => 'minutes' ],
-			],
+            #main
+            [ '_cnf' => [ 'repeat' => false ],
+                'header' => [ 'type' => 'hex' ]
+            ],
 
-			#Metering module config
-			[ '_cnf' => [ 'repeat' => false, 'when' => [ [ 'header' => '01' ] ] ],
+            #Reporting intervals
+            [ '_cnf' => [ 'repeat' => false, 'when' => [ [ 'header' => '00' ] ] ],
+                'usage_interval' => [ 'type' => 'uint16', 'unit' => 'minutes' ],
+                'status_interval' => [ 'type' => 'uint16', 'unit' => 'minutes' ],
+            ],
 
-				'device' => [ 'type' => 'byte', 'bits' => [
-					'device_0' => [ 'not selected', 'selected' ],
-					'device_1' => [ 'not selected', 'selected' ]
-				] ],
+            #Metering module config
+            [ '_cnf' => [ 'repeat' => false, 'when' => [ [ 'header' => '01' ] ] ],
 
-				'channel' => [ 'type' => 'byte', 'bits' => [
-					'channel_0' => [ 'not selected', 'selected' ],
-					'channel_1' => [ 'not selected', 'selected' ],
-					'channel_2' => [ 'not selected', 'selected' ],
-					'channel_3' => [ 'not selected', 'selected' ],
-					'channel_4' => [ 'not selected', 'selected' ],
-					'channel_5' => [ 'not selected', 'selected' ],
-					'channel_6' => [ 'not selected', 'selected' ],
-					'channel_7' => [ 'not selected', 'selected' ]
-				] ],
+                'device' => [ 'type' => 'byte', 'bits' => [
+                    'device_0' => [ 'not selected', 'selected' ],
+                    'device_1' => [ 'not selected', 'selected' ]
+                ] ],
 
-				'transformer' => [ 'type' => 'hex', 'formatter' => [
-					[ 'value' => '00', 'type' => 'disabled' ],
-					[ 'value' => '01', 'type' => 'closed_loop' ],
-					[ 'value' => '02', 'type' => "open_loop" ],
-					[ 'value' => '02', 'type' => "3rd_party" ]
-				] ],
+                'channel' => [ 'type' => 'byte', 'bits' => [
+                    'channel_0' => [ 'not selected', 'selected' ],
+                    'channel_1' => [ 'not selected', 'selected' ],
+                    'channel_2' => [ 'not selected', 'selected' ],
+                    'channel_3' => [ 'not selected', 'selected' ],
+                    'channel_4' => [ 'not selected', 'selected' ],
+                    'channel_5' => [ 'not selected', 'selected' ],
+                    'channel_6' => [ 'not selected', 'selected' ],
+                    'channel_7' => [ 'not selected', 'selected' ]
+                ] ],
 
-				'amp_rating' => [ 'type' => 'uint8', 'unit' => 'amp' ],
-				'twist_count' => [ 'type' => 'uint16' ],
-			],
-		];
+                'transformer' => [ 'type' => 'hex', 'formatter' => [
+                    [ 'value' => '00', 'type' => 'disabled' ],
+                    [ 'value' => '01', 'type' => 'closed_loop' ],
+                    [ 'value' => '02', 'type' => "open_loop" ],
+                    [ 'value' => '02', 'type' => "3rd_party" ]
+                ] ],
+
+                'amp_rating' => [ 'type' => 'uint8', 'unit' => 'amp' ],
+                'twist_count' => [ 'type' => 'uint16' ],
+            ],
+        ];
 
         # fport 99
         $struct[ 99 ] = [
@@ -171,16 +173,16 @@ class pmg {
                     'minor' => [ 'type' => 'uint8' ],
                     'patch' => [ 'type' => 'uint8' ],
                 ],
-                'extension_module_0'=>['type'=>'hex', 'formatter'=>[
-                    ['value'=>'00', 'name'=>'switch'],
-                    ['value'=>'01', 'name'=>'meter'],
-                    ['value'=>'ff', 'name'=>'not connected']
-                ]],
-                'extension_module_1'=>['type'=>'hex', 'formatter'=>[
-                    ['value'=>'00', 'name'=>'switch'],
-                    ['value'=>'01', 'name'=>'meter'],
-                    ['value'=>'ff', 'name'=>'not connected']
-                ]],
+                'extension_module_0' => [ 'type' => 'hex', 'formatter' => [
+                    [ 'value' => '00', 'name' => 'switch' ],
+                    [ 'value' => '01', 'name' => 'meter' ],
+                    [ 'value' => 'ff', 'name' => 'not connected' ]
+                ] ],
+                'extension_module_1' => [ 'type' => 'hex', 'formatter' => [
+                    [ 'value' => '00', 'name' => 'switch' ],
+                    [ 'value' => '01', 'name' => 'meter' ],
+                    [ 'value' => 'ff', 'name' => 'not connected' ]
+                ] ],
             ],
 
 
@@ -196,10 +198,10 @@ class pmg {
             ],
 
         ];
-		
 
-		return $struct;
-	}
+
+        return $struct;
+    }
 
     /**
      * @return array
@@ -211,4 +213,3 @@ class pmg {
     }
 
 }
-?>

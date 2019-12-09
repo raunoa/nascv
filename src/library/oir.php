@@ -157,7 +157,7 @@ class oir
                     [ 'value' => '03', 'name' => 'Wh_electricity' ],
                     [ 'value' => '04', 'name' => 'L_gas' ],
                     [ 'value' => '05', 'name' => 'Wh_heat' ],
-                    [ 'value' => '0F', 'name' => 'other' ],
+                    [ 'value' => '0F', 'name' => 'unit_other' ],
                     [ 'value' => '?', 'name' => 'n/a' ],
                 ] ],
             ] ],
@@ -440,7 +440,7 @@ class oir
                     [ 'value' => '03', 'name' => 'Wh_electricity' ],
                     [ 'value' => '04', 'name' => 'L_gas' ],
                     [ 'value' => '05', 'name' => 'Wh_heat' ],
-                    [ 'value' => '0F', 'name' => 'other' ],
+                    [ 'value' => '0F', 'name' => 'unit_other' ],
                     [ 'value' => '?', 'name' => 'n/a' ],
                 ] ],
 
@@ -484,7 +484,7 @@ class oir
                         [ 'value' => '03', 'name' => 'Wh_electricity' ],
                         [ 'value' => '04', 'name' => 'L_gas' ],
                         [ 'value' => '05', 'name' => 'Wh_heat' ],
-                        [ 'value' => '0F', 'name' => 'other' ],
+                        [ 'value' => '0F', 'name' => 'unit_other' ],
                         [ 'value' => '?', 'name' => 'n/a' ],
                     ] ],
 
@@ -564,7 +564,7 @@ class oir
                     [ 'bit' => 0, 'parameter' => 'interface_enabled', 'formatter' => [ 'disabled', 'enabled' ] ],
                     [ 'bit' => 2, 'parameter' => 'reporting', 'formatter' => [ 'not_sent', 'sent' ] ],
                 ] ],
-                'general' => ['when' => [ [ 'configured_parameters:interface_enabled' => 1 ]], 'type' => 'byte', 'bits' => [
+                'general' => [ 'when' => [ [ 'configured_parameters:interface_enabled' => 1 ] ], 'type' => 'byte', 'bits' => [
                     'sampling_rate' => [ '1_min', '1_sec' ],
                     'input_mode' => [ 'V', 'mA' ] ] ],
                 'reporting' => [ 'type' => 'byte', 'when' => [ [ 'configured_parameters:reporting' => 1 ] ],
@@ -880,7 +880,7 @@ class oir
     /**
      * @return array
      */
-    public function tx_fport()   
+    public function tx_fport()
     {
         $rx_obj = rx_fport();
 
@@ -888,5 +888,3 @@ class oir
         return $struct;
     }
 }
-
-?>

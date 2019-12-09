@@ -88,20 +88,20 @@ class mbus_defs {
     //
     //Mode 1 Mode 2 Application Definition in
     // 51h 55h data send EN1434-3
-    // 52h 56h selection of slaves Usergroup July  Ì93
-    // 50h application reset Usergroup March  Ì94
+    // 52h 56h selection of slaves Usergroup July 93
+    // 50h application reset Usergroup March 94
     // 54h synronize action suggestion
-    // B8h set baudrate to 300 baud Usergroup July  Ì93
-    // B9h set baudrate to 600 baud Usergroup July  Ì93
-    // BAh set baudrate to 1200 baud Usergroup July  Ì93
-    // BBh set baudrate to 2400 baud Usergroup July  Ì93
-    // BCh set baudrate to 4800 baud Usergroup July  Ì93
-    // BDh set baudrate to 9600 baud Usergroup July  Ì93
+    // B8h set baudrate to 300 baud Usergroup July 93
+    // B9h set baudrate to 600 baud Usergroup July 93
+    // BAh set baudrate to 1200 baud Usergroup July 93
+    // BBh set baudrate to 2400 baud Usergroup July 93
+    // BCh set baudrate to 4800 baud Usergroup July 93
+    // BDh set baudrate to 9600 baud Usergroup July 93
     // BEh set baudrate to 19200 baud suggestion
     // BFh set baudrate to 38400 baud suggestion
     // B1h request readout of complete RAM content Techem suggestion
     // B2h send user data (not standardized RAM write) Techem suggestion
-    // B3h initialize test calibration mode Usergroup July  Ì93
+    // B3h initialize test calibration mode Usergroup July 93
     // B4h EEPROM read Techem suggestion
     // B6h start software test Techem suggestion
     // 90h to 97h codes used for hashing longer recommended

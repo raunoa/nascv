@@ -27,11 +27,11 @@ class lgm
 
             [ '_cnf' => [ 'repeat' => 3, ],
                 'mesuring_time' => [ 'type' => 'uint8' ],
-                'metering_data' => [ 'type' => 'uint32', 'unit'=>'L' ],
+                'metering_data' => [ 'type' => 'uint32', 'unit' => 'L' ],
             ],
 
             [ '_cnf' => [ 'repeat' => false, ],
-                'elster_meter_id' => [ 'type' => 'hex', 'length'=>4 ],
+                'elster_meter_id' => [ 'type' => 'hex', 'length' => 4 ],
             ],
 
         ];
@@ -90,5 +90,3 @@ class lgm
     }
 
 }
-
-?>

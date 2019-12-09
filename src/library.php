@@ -17,7 +17,4 @@ $lib['fport_list'] = '[{"fport":"1","data_type":"float","description":"Temperatu
  * NASCV functions
  */
 
-$lib['functions'] = '{"binary":"str2bin","json":"str2json","hex":"ascii2hex","decimal":"ascii2dec","float":"ascii2float","gps":"ascii2gps","dhex":"ascii2dhex","ascii":""}'
-
-
-?>
+$lib['functions'] = '{"binary":"str2bin","json":"str2json","hex":"ascii2hex","decimal":"ascii2dec","float":"ascii2float","gps":"ascii2gps","dhex":"ascii2dhex","ascii":""}';

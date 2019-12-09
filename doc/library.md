@@ -360,3 +360,27 @@ One advanced example, how you can send before converted data to external plugin.
 ```
 
 >Length `*` symbol means that we use all the rest of the data not just 1byte.
+
+
+## Metering data
+
+Metering data is for to fill device capability structure with data from converted data. 
+
+```sh
+ 'metering' => [ 'tag' => 'node_rx_rssi' ] ],
+```
+
+example
+```sh
+'downlink_rssi' => [ 'type' => 'uint8', 'unit' => 'dBm', 'converter' => '*-1', 'metering' => [ 'tag' => 'node_rx_rssi' ] ],
+```
+
+downlink_rssi is original name and for metering function is node_rx_rssi.
+
+#### Example to use metering tag with wmbus
+
+```sh
+'metering' => [ [ 'tag' => 'accumulated_volume', 'path' => 'data_records:*:_header_raw=0413' ] ]
+```
+
+In **path** can be describe where is object with value. 

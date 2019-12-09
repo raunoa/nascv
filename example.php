@@ -5,12 +5,16 @@
  * @copyright NAS 2019
 */
 
+ini_set( 'display_errors', 1 );
+ini_set( 'display_startup_errors', 1 );
+error_reporting( E_ALL );
+
 require 'src/nascv.php';
 $cv = new nascv;
 $msg = array( 'data' => 'SnUOXACfRAIE/zJEBQr/MkQBAv8ARAQI/wBEAwb/AEQGDP8A',
     'fport' => '24',
     'serial' => '4d1b0092',
-    'firmware' => '0.5.0' );
+    'firmware' => '0.5.0');
 $data = $cv->data( $msg );
 
 ?>
@@ -70,7 +74,7 @@ $data = $cv->data( $msg );
 
         <div class="tab-pane fade" id="klm" role="tabpanel" aria-labelledby="klm-tab">
             <pre><?php
-                echo json_encode( json_decode( $cv->call_library( 'KLM' )->register ), JSON_PRETTY_PRINT );
+                echo json_encode( json_decode( $cv->call_library( 'KLM' )->klm_register ), JSON_PRETTY_PRINT );
                 ?></pre>
         </div>
     </div>

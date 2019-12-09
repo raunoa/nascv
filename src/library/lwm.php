@@ -1,14 +1,80 @@
 <?php
+require_once 'components/registers.php';
 
-class lwm
+class lwm extends registers
 {
 
     public $nascv;
 
+    /**
+     * Capability structure for LWM
+     * @return array
+     */
+    public function capability_structure()
+    {
+        $base = $this->capability_base_structure;
+
+        $upn = $this->nascv->product_upn;
+
+        $base[ 'data' ] = array_merge( $base[ 'data' ], [
+            'accumulated_volume' => [ 'available' => true ],
+            'flow_rate' => [ 'available' => false ],
+            'flow_rate_max' => [ 'available' => false ],
+            'flow_rate_min' => [ 'available' => false ],
+            'water_temperature' => [ 'available' => false ],
+            'node_temperature' => [ 'available' => true ],
+            'node_status' => [ 'available' => true ],
+            'node_battery_voltage' => [ 'available' => true ],
+            'node_battery_percentage' => [ 'available' => true ]
+        ] );
+
+        $base[ 'network' ] = array_merge( $base[ 'network' ], [
+            'gateway_rssi_avg' => [ 'available' => true ],
+            'gateway_snr_avg' => [ 'available' => true ],
+            'gateway_rssi_last' => [ 'available' => true ],
+            'gateway_snr_last' => [ 'available' => true ],
+            'node_rssi_avg' => [ 'available' => true ],
+            'node_snr_avg' => [ 'available' => true ],
+        ] );
+
+        $base[ 'configuration' ] = array_merge( $base[ 'configuration' ], [
+            'radio_mode' => [ 'available' => true ],
+            'fixed_metering_enabled' => [ 'available' => true ],
+            'reporting_interval' => [ 'available' => true ],
+            'customer_eic' => [ 'available' => true ],
+            'location_eic' => [ 'available' => true ] ] );
+
+        $base[ 'event' ] = array_merge( $base[ 'event' ], [
+            'node_app_connected' => [ 'available' => false ],
+            'node_magnet_triggered' => [ 'available' => true ],
+            'reverse_flow_alert' => [ 'available' => true ],
+            'leak_alert' => [ 'available' => true ],
+            'burst_alert' => [ 'available' => true ] ] );
+
+        if ($upn != 'CM3021') {
+            $base[ 'event' ][ 'burst_alert' ] = [ 'available' => false ];
+        }
+
+        return $base;
+    }
+
     # structure by fport
     function rx_fport()
     {
+
         $struct = [];
+
+        # fport 18
+        $struct[ 18 ] = [
+            [ '_cnf' => [ 'repeat' => false ],
+                'wmbus' => [ 'type' => 'hex', 'byte_order' => 'LSB', 'length' => '*',
+                    'ext' => [ 'php-mbus', [ 'type' => 'wmbus_frame_b' ] ],
+                    'metering' => [
+                        [ 'tag' => 'accumulated_volume', 'path' => 'data_records:*:_header_raw=0413' ],
+                        [ 'tag' => 'flow_rate_max', 'path' => 'data_records:*:_header_raw=523b' ]
+                    ]
+                ],
+            ] ];
 
         # fport 24
         $struct[ 24 ] = [
@@ -161,6 +227,7 @@ class lwm
         if ($this->nascv->firmware >= 1.0) {
             include 'components/ukw.php';
         }
+
         return $struct;
     }
 
@@ -173,5 +240,3 @@ class lwm
         return $tx;
     }
 }
-
-?>

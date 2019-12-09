@@ -3,12 +3,12 @@
  * NAS Converters
  * @author Rauno Avel
  * @copyright NAS 2019
- * @version 8.1
+ * @version 8.4
  */
 
 class nascv
 {
-    public $version = 8.1; // NAS converter version
+    public $version = 8.4; // NAS converter version
 
     public $unit = ''; // message unit
     public $type = ''; // message converting type
@@ -45,6 +45,10 @@ class nascv
             $lib[ $k ] = json_decode( $v, true );
         }
         $this->lib = $lib;
+
+        if (version_compare( phpversion(), '7.1', '>=' )) {
+            ini_set( 'serialize_precision', -1 );
+        }
     }
 
     /**
@@ -60,11 +64,6 @@ class nascv
         #clean cach
         $this->obj = array();
 
-        # if no data, then do not start decode
-        if (!isset( $msg[ 'data' ] )) {
-            return NULL;
-        }
-
         $library = 'other';
         if (isset( $msg[ 'serial' ] )) {
             $library = self::find_library( strtolower( $msg[ 'serial' ] ) );
@@ -72,6 +71,12 @@ class nascv
         if (isset( $msg[ 'library' ] )) {
             $library = self::find_library( strtolower( $msg[ 'library' ] ) );
         }
+
+        # if no data, then do not start decode
+        if (!isset( $msg[ 'data' ] )) {
+            return NULL;
+        }
+
         if (isset( $msg[ 'direction' ] )) {
             $this->direction = strtolower( $msg[ 'direction' ] );
         }
@@ -133,7 +138,11 @@ class nascv
 
         # start parsering data by given library structure
         $l = $this->call_library( $library );
-        if ($l !== false and $this->type == 'hex') {
+        if ($this->type == 'hex') {
+            if ($l == false) {
+                $l = $this->call_library( 'other' );
+                $this->product = 'n/a';
+            }
             $struct = ($this->direction == 'rx' ? $l->rx_fport() : $l->tx_fport());
             if (isset( $struct[ $this->fport ] )) {
                 $this->hex = $hex = self::ascii2hex( $data, 'MSB' );
@@ -151,9 +160,179 @@ class nascv
             return $this->data = $data;
         }
         return $this->data = $this->$func( $data, $this->byte );
-
     }
 
+    /**
+     * @param $data
+     * @return bool|array
+     */
+    public
+
+    function metering( $data )
+    {
+        if ($this->product != '' and $this->fport != '') {
+            $capability = $this->capability_structure( $this->product );
+            if (is_array( $capability )) {
+                $l = $this->call_library( $this->product )->rx_fport()[ $this->fport ];
+                $metering_obj = self::create_metering_data_obj( $l );
+
+                if (is_array( $l ) and count( $l ) > 0) {
+                    $results = array();
+                    foreach ($metering_obj as $k => $v) {
+                        $k = explode( ':', $k )[ 0 ];
+                        if (isset( $v[ 'path' ] )) {
+                            $value = $this->find_metering_path( $k . ':' . $v[ 'path' ], $data );
+                        } else {
+                            $value = $this->array_search( $k, $data );
+                        }
+                        if ($value !== false) {
+                            if (is_array( $value )) {
+                                foreach ($value as $key => $val) {
+                                    if (!in_array( $key, array( 'value', 'unit', '_unit', 'formatted' ) ))
+                                        unset( $value[ $key ] );
+                                }
+                            }
+                            if (is_array( $value ) and count( $value ) == 0)
+                                continue;
+
+                            if (isset( $v[ 'when' ] )) {
+                                $w = explode( ':', array_keys( $v[ 'when' ][ 0 ] )[ 0 ] );
+                                $d = $data;
+                                if (is_array( $w )) {
+                                    foreach ($w as $wn) {
+                                        if (isset( $d[ $wn ] ))
+                                            $d = $d[ $wn ];
+                                    }
+                                }
+                                if (isset( $d[ 'value' ] ) and $d[ 'value' ] != array_values( $v[ 'when' ][ 0 ] )[ 0 ]) {
+                                    continue;
+                                }
+                            }
+                            $results[ $v[ 'tag' ] ] = $value;
+                        }
+                    }
+
+                    $formatted = array();
+                    foreach ($capability as $group => $keys) {
+                        foreach ($keys as $k => $d) {
+                            if (isset( $results[ $k ] )) {
+                                $formatted[ $group ][ $k ] = $results[ $k ];
+                            }
+                        }
+                    }
+                    return $formatted;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * @param $key
+     * @param $array
+     * @return array|mixed
+     */
+    private
+
+    function array_search( $key, $array )
+    {
+        $results = array();
+        foreach ($array as $k => $v) {
+            if ($k == $key) {
+                $results = $v;
+            } else {
+                if (is_array( $v )) {
+                    $results = array_merge( $results, $this->array_search( $key, $v ) );
+                }
+            }
+        }
+        return $results;
+    }
+
+
+    /**
+     * @param $path
+     * @param $data
+     * @return array|mixed
+     */
+    private
+
+    function find_metering_path( $path, $data )
+    {
+        if (!is_array( $path )) {
+            $path = explode( ':', $path );
+        }
+        $results = array();
+        foreach ($path as $i => $key) {
+            if (strstr( $key, '=' )) {
+                list( $k, $pv ) = explode( '=', $key );
+                if (isset( $data[ $k ] ) and $data[ $k ] == $pv) {
+                    $results = $data;
+                }
+            }
+            if ($key == '*') {
+                unset( $path[ $i ] );
+                foreach ($data as $d) {
+                    $value = $this->find_metering_path( $path, $d );
+                    if (is_array( $value ) and count( $value ) > 0) {
+                        $results = $value;
+                    }
+                }
+            }
+            if (isset( $data[ $key ] )) {
+                $data = $data[ $key ];
+                unset( $path[ $i ] );
+            }
+        }
+        return $results;
+    }
+
+
+    /**
+     * @param $library_obj
+     * @return array
+     */
+    private
+
+    function create_metering_data_obj( $library_obj )
+    {
+        $results = array();
+        foreach ($library_obj as $k => $v) {
+            $key = $k;
+            if (isset( $v[ 'parameter' ] )) {
+                $key = $v[ 'parameter' ];
+            }
+            if (isset( $v[ 'metering' ] ) and (isset( $v[ 'metering' ][ 0 ][ 'tag' ] ) or isset( $v[ 'metering' ][ 'tag' ] ))) {
+                if (isset( $v[ 'metering' ][ 'tag' ] )) {
+                    $results[ $key ] = $v[ 'metering' ];
+                } else {
+                    foreach ($v[ 'metering' ] as $mk => $mv) {
+                        $results[ $key . ':' . $mk ] = $mv;
+                    }
+                }
+            } else {
+                if (is_array( $v )) {
+                    $results = array_merge( $results, $this->create_metering_data_obj( $v ) );
+                }
+            }
+        }
+        return $results;
+    }
+
+    /**
+     * @param string $library
+     * @return bool|array
+     */
+    public
+
+    function capability_structure( $library = '' )
+    {
+        $lib = $this->call_library( $library );
+        if (method_exists( $lib, 'capability_structure' )) {
+            return $lib->capability_structure();
+        }
+        return false;
+    }
 
     /**
      * HEX parser
@@ -165,7 +344,7 @@ class nascv
      */
     private
 
-    function parser_hex( & $hex, $struct, $sub = false, $_id = '' )
+    function parser_hex( &$hex, $struct, $sub = false, $_id = '' )
     {
         if ($_id == '') $_id = uniqid();
         $return = array();
@@ -198,6 +377,9 @@ class nascv
                         $repeat_result = array();
                         for ($i = 1; $i <= $v[ 'repeat' ]; $i++) {
                             $length = (isset( $v[ 'length' ] ) ? $v[ 'length' ] : 1);
+                            if (substr( $obj[ 'type' ], 0, 1 ) == '{') {
+                                $obj[ 'type' ] = self::find_unit( array( substr( substr( $obj[ 'type' ], 1 ), 0, -1 ) ), $_id );
+                            }
                             $data = self::bite_hex( $hex, $obj[ 'type' ], '', $length );
                             if ($data == '' and $previous_hex != '') {
                                 $data = $previous_hex;
@@ -256,6 +438,9 @@ class nascv
                                     }
                                     if (isset( $v[ 'when' ] )) {
                                         if (self::control_values( $v[ 'when' ], $_id )) {
+                                            if (substr( $v[ 'type' ], 0, 1 ) == '{') {
+                                                $v[ 'type' ] = self::find_unit( array( substr( substr( $v[ 'type' ], 1 ), 0, -1 ) ), $_id );
+                                            }
                                             $data = self::bite_hex( $hex, $v[ 'type' ], '', $length );
                                             $data = $this->parsering( $data, $v, $_id );
                                             if ($data != NULL) {
@@ -268,6 +453,9 @@ class nascv
                                         }
                                     } else {
                                         if (isset( $v[ 'type' ] )) {
+                                            if (substr( $v[ 'type' ], 0, 1 ) == '{') {
+                                                $v[ 'type' ] = self::find_unit( array( substr( substr( $v[ 'type' ], 1 ), 0, -1 ) ), $_id );
+                                            }
                                             $data = self::bite_hex( $hex, $v[ 'type' ], '', $length );
                                             if ($data == ''
                                                 and $previous_hex != '') {
@@ -321,7 +509,11 @@ class nascv
                         $new_value = $struct_formatter;
                         preg_match_all( '~\{([^}]*)\}~', $struct_formatter, $matches );
                         foreach ($matches[ 1 ] as $sf_v) {
-                            $val = @trim( self::find_attr( array( $sf_v ), 'formatted', $_id ) );
+                            if ($sf_v == 'this') {
+                                $val = $object_r;
+                            } else {
+                                $val = @trim( self::find_attr( array( $sf_v ), 'formatted', $_id ) );
+                            }
                             $new_value = str_replace( '{' . $sf_v . '}', $val, $new_value );
                             $f_key = array_values( array_slice( explode( ':', $sf_v ), -1 ) )[ 0 ];
                             $this->obj[ $_id ][ '_' ][ $f_key ] = $val;
@@ -370,25 +562,19 @@ class nascv
      * @param $str
      * @return mixed
      */
+    private
+
     function Math( $str )
     {
-        preg_match_all( '/Math\(([^)]+)\)/m', $str, $matches, PREG_SET_ORDER, 0 );
+        preg_match_all( '~Math\((.*)\)~', $str, $matches, PREG_SET_ORDER, 0 );
         $math = $matches[ 0 ][ 1 ];
-        if (preg_match( '/(\d+)(?:\s*)([\+\-\*\/])(?:\s*)(\d+)/', $math, $matches ) !== FALSE) {
-            print_r( $matches );
-            switch ($matches[ 2 ]) {
-                case '+':
-                    return $matches[ 1 ] + $matches[ 3 ];
-                    break;
-                case '-':
-                    return $matches[ 1 ] - $matches[ 3 ];
-                    break;
-                case '*':
-                    return $matches[ 1 ] * $matches[ 3 ];
-                    break;
-                case '/':
-                    return $matches[ 1 ] / $matches[ 3 ];
-                    break;
+        if (preg_match_all( '~([-0-9]+)|([+-/*)(])~m', $math, $matches, PREG_SET_ORDER, 0 ) !== FALSE) {
+            $cal_term = '';
+            foreach ($matches as $k => $v) {
+                $cal_term .= $v[ 0 ];
+            }
+            if ($cal_term != '') {
+                $math = eval( 'return ' . $cal_term . ';' );
             }
         }
         return $math;
@@ -534,11 +720,25 @@ class nascv
                                 $val = self::value_converter( $val, $byte_obj[ 'converter' ] );
                             }
 
-                            if (is_numeric( $val )) $val = (int)$val;
-                            $r[ $byte_obj[ 'parameter' ] ] = array( 'value' => $val );
+
+                            $r[ $byte_obj[ 'parameter' ] ] = array( 'value' => self::str2number( $val, (isset( $byte_obj[ 'type' ] ) ? $byte_obj[ 'type' ] : '') ) );
                             if (isset( $byte_obj[ 'formatter' ] )) {
                                 $f = $byte_obj[ 'formatter' ];
-                                if (!is_array( $f ) and strstr( $f, '%' )) {
+                                if (!is_array( $f ) and substr( $f, 0, 4 ) == 'Math') {
+                                    $new_value = $f;
+                                    preg_match_all( '~\{([^}]*)\}~', $f, $matches );
+                                    foreach ($matches[ 1 ] as $sf_v) {
+                                        if ($sf_v == 'this') {
+                                            $val = $r[ $byte_obj[ 'parameter' ] ][ 'value' ];
+                                        } else {
+                                            $val = @trim( self::find_attr( array( $sf_v ), 'value', $_id ) );
+                                        }
+                                        $new_value = str_replace( '{' . $sf_v . '}', $val, $new_value );
+                                        $f_key = array_values( array_slice( explode( ':', $sf_v ), -1 ) )[ 0 ];
+                                        $this->obj[ $_id ][ '_' ][ $f_key ] = $val;
+                                    }
+                                    $r[ $byte_obj[ 'parameter' ] ][ 'formatted' ] = self::Math( $new_value ) . (isset( $byte_obj[ 'unit' ] ) ? ' ' . $byte_obj[ 'unit' ] : '');
+                                } elseif (!is_array( $f ) and strstr( $f, '%' )) {
                                     $r[ $byte_obj[ 'parameter' ] ][ 'formatted' ] = sprintf( $f, $val, $byte_obj[ 'unit' ] );
                                 } elseif (isset( $f[ 0 ][ 'value' ] )) {
                                     $form = '';
@@ -560,7 +760,7 @@ class nascv
                         } else {
                             # simple bit description array(false,true);
                             $val = substr( $bin, -$i, 1 );
-                            $r[ $byte_name ] = array( 'value' => $val );
+                            $r[ $byte_name ] = array( 'value' => self::str2number( $val, (isset( $byte_obj[ 'type' ] ) ? $byte_obj[ 'type' ] : '') ) );
                             if (isset( $byte_obj[ substr( $bin, -$i, 1 ) ] )) {
                                 $r[ $byte_name ][ 'formatted' ] = $byte_obj[ substr( $bin, -$i, 1 ) ];
                             }
@@ -629,11 +829,12 @@ class nascv
                 $data = self::value_converter( $data, $v[ 'converter' ] );
             }
             # default value
-            $return = array( 'value' => $data, 'unit' => '' );
+            $return = array( 'value' => self::str2number( $data, $v[ 'type' ] ), 'unit' => '' );
             if (isset( $v[ 'unit' ] )) {
                 if (is_array( $v[ 'unit' ] )) {
                     $unit_arr = $v[ 'unit' ];
                     if (isset( $unit_arr[ 1 ] ) and is_array( $unit_arr[ 1 ] )) {
+                        /** @var array $index */
                         $index = self::find_unit( array( $unit_arr[ 0 ] ), $_id );
                         $unit = '';
                         if (isset( $index[ "value" ] )) {
@@ -653,7 +854,7 @@ class nascv
                 }
             }
             if (is_array( $return[ 'unit' ] )) {
-                $return[ 'unit' ] = 'n/a';
+                $return[ 'unit' ] = '';
             }
             #formatting
 
@@ -674,6 +875,7 @@ class nascv
                     }
                     //formatter sprintf
                     if ($f_v[ 'value' ] == '?' or $f_v[ 'value' ] == '*') {
+
                         $return[ 'formatted' ] = sprintf( $f_v[ 'name' ], $return[ 'value' ], $return[ 'unit' ] );
                     }
                     // make changes
@@ -731,15 +933,51 @@ class nascv
                     }
                 }
             }
+
+            $return[ 'value' ] = self::str2number( $return[ 'value' ], $v[ 'type' ] );
+
+            /* version 8.4: Units with leading _ */
+            $return[ '_unit' ] = $return[ 'unit' ];
+            unset( $return[ 'unit' ] );
+
+            foreach ($return as $k => $v) {
+                if ($v === '') {
+                    unset( $return[ $k ] );
+                }
+            }
             return $return;
         }
+    }
+
+    /**
+     * @param $str
+     * @param string $type
+     * @return float|int|string
+     */
+    private
+
+    function str2number( $str, $type = '' )
+    {
+        if ($type == 'hex') {
+            return $str;
+        }
+        if (is_numeric( $str )) {
+            if (is_float( $str + 0 )) {
+                return (float)$str;
+            } else {
+                return (int)$str;
+            }
+        }
+        return $str;
     }
 
     /**
      * @param $name
      * @return mixed
      */
-    private function call_ext( $name )
+    private
+
+    function call_ext( $name )
     {
         $file = dirname( __DIR__ ) . '/ext/' . $name . '/' . $name . '.php';
         $class_name = str_replace( '-', '_', $name );
@@ -852,10 +1090,9 @@ class nascv
      * @param int $length
      * @return bool|string
      */
-
     private
 
-    function bite_hex( & $hex, $type, $bite = '', $length = 1 )
+    function bite_hex( &$hex, $type, $bite = '', $length = 1 )
     {
         if (strstr( $type, 'uint' )) {
             $byte = str_replace( 'uint', '', $type ) / 8;
@@ -949,6 +1186,7 @@ class nascv
     {
         return $this->lib[ 'ipd_list' ];
     }
+
 
     /**
      * get Libraries
@@ -1118,18 +1356,26 @@ class nascv
      * @param $man_id
      * @return string
      */
-    private
+    public
 
     function wmbus_manufacturer( $man_id )
     {
-        $id = 0x00;
-        $man_id = str_split( $man_id, 2 );
-        $id |= (hexdec( $man_id[ 1 ] ) << 0);
-        $id |= (hexdec( $man_id[ 0 ] ) << 8);
-        return
-            chr( ($id >> 10) + 64 ) .
-            chr( ($id >> 5 & 0x001F) + 64 ) .
-            chr( ($id & 0x001F) + 64 );
+        if (strlen( $man_id ) == 4) {
+            $id = 0x00;
+            $man_id = str_split( $man_id, 2 );
+            $id |= (hexdec( $man_id[ 1 ] ) << 0);
+            $id |= (hexdec( $man_id[ 0 ] ) << 8);
+            return
+                chr( ($id >> 10) + 64 ) .
+                chr( ($id >> 5 & 0x001F) + 64 ) .
+                chr( ($id & 0x001F) + 64 );
+        } else {
+            $man_id = str_split( $man_id );
+            $id = ((ord( $man_id[ 0 ] ) - 64) * 32 * 32) +
+                ((ord( $man_id[ 1 ] ) - 64) * 32) +
+                (ord( $man_id[ 2 ] ) - 64);
+            return $this->addZero( $this->dec2hex( $id ), 4 );
+        }
     }
 
 
@@ -1139,7 +1385,7 @@ class nascv
      * @param int $step
      * @return string
      */
-    private
+    public
 
     function byte_order_reverse( $str, $step = 2 )
     {
@@ -1414,6 +1660,7 @@ class nascv
 
     /**
      * @param $hex
+     * @param string $byte_order
      * @return string
      */
     function hex2ascii( $hex, $byte_order = 'LSB' )
@@ -1469,10 +1716,11 @@ class nascv
             $unit = (isset( $data[ 'unit' ] ));
             foreach ($data as $k => $v) {
                 /** make data loop */
+                if (substr( $k, 0, 1 ) == '_') continue;
                 $k = str_replace( '_', ' ', $k );
                 if (is_array( $v )) {
                     /** is array */
-                    if (isset( $v[ 'formatted' ] )) {
+                    if (isset( $v[ 'formatted' ] ) and !isset( $v[ 'value_type' ] )) {
                         /** is formatted value */
                         if (is_bool( $v[ 'formatted' ] )) {
                             $v[ 'formatted' ] = ($v[ 'formatted' ] ? 'true' : 'false');
@@ -1485,7 +1733,7 @@ class nascv
                         }
                         $html .= '<td class="text-left"><b>' . $v[ 'formatted' ] . '</b></td>';
                         $html .= '</tr>';
-                    } elseif (count( $v ) == 2 and isset( $v[ 'unit' ] ) and isset( $v[ 'value' ] )) {
+                    } elseif (count( $v ) == 2 and isset( $v[ 'unit' ] ) and isset( $v[ 'value' ] ) and !isset( $v[ 'value_type' ] )) {
                         /** if there is only unit and value */
                         $html .= '<tr>';
                         if (!is_numeric( $k ) and strlen( $k ) > 2) {
@@ -1507,7 +1755,11 @@ class nascv
                         if (isset( $v[ 0 ] ) and !is_array( $v[ 0 ] ) and key( $check_v ) == '0') {
                             $html .= '<b>' . implode( ', ', $v ) . '</b>';
                         } else {
-                            $html .= self::toHTML( $v, 'table table-bordered', $width + ($width < 20 ? 25 : 10) );
+                            if (isset( $v[ 'value_type' ] ) and isset( $v[ 'formatted' ] )) {
+                                $v[ 'value' ] = $v[ 'formatted' ];
+                                unset( $v[ 'formatted' ] );
+                            }
+                            $html .= self::toHTML( $v, 'table table-bordered', $width + ($width < 10 ? 20 : $width / 2) );
                         }
                         $html .= '</td>';
                         $html .= '</tr>';
@@ -1565,7 +1817,23 @@ class nascv
             'product' => (!empty( $this->product ) ? $this->product : 'unknown'),
             'main' => null );
 
-        if (is_array( $data ) && !empty( $data ) and $this->fport != '99') {
+        if (!empty( $data ) and is_array( $data ) and $this->fport != '99') {
+
+            /**
+             * find counter
+             */
+            if (isset( $data[ 'counter' ] )) {
+                $r[ 'main' ][ 0 ] = array( 'name' => 'Counter', 'value' => $data[ 'counter' ][ 'value' ], 'unit' => $data[ 'counter' ][ 'unit' ] );
+            }
+
+            /**
+             * Wm-BUS
+             */
+
+            if ($this->product === 'WML' || ($this->fport == '18')) {
+                $r[ 'main' ][] = array( 'test' );
+            }
+
 
             /**
              * OIR
@@ -1908,6 +2176,53 @@ class nascv
                 $r[ 'main' ] = $returnChannels;
             }
 
+            /**
+             * LWM
+             */
+            if ($this->product == 'LWM') {
+                //from fport 24
+                if (isset( $data[ 'counter' ] ) && isset( $data[ 'packet_type' ] ) && $data[ 'packet_type' ] == 'usage_packet') {
+                    $returnChannels[] = [
+                        'name' => 'Water',
+                        'value' => isset( $data[ 'counter' ][ 'value' ] ) ? $data[ 'counter' ][ 'value' ] : 0,
+                        'unit' => isset( $data[ 'counter' ][ 'unit' ] ) ? $data[ 'counter' ][ 'unit' ] : '',
+                        'formatted' => isset( $data[ 'counter' ][ 'formatted' ] ) ? $data[ 'counter' ][ 'formatted' ] : '',
+                        'medium_type' => 'water'
+                    ];
+                    $r[ 'main' ] = $returnChannels;
+                    //from fport 25
+                } elseif (isset( $data[ 'packet_type' ] ) && $data[ 'packet_type' ] == 'status_packet') {
+                    $ignoredChannels = [ 'packet_type', 'general', 'active_alerts', 'temp_extremes', 'calibration_delta', 'hex' ];
+                    foreach ($data as $channelKey => $channel) {
+                        //ignored some channels
+                        if (in_array( $channelKey, $ignoredChannels )) {
+                            continue;
+                        }
+                        //MAIN value
+                        if (!$returnChannels && $channelKey == 'instant_counter') {
+                            $returnChannel = [
+                                'name' => 'Water',
+                                'value' => isset( $channel[ 'value' ] ) ? $channel[ 'value' ] : 0,
+                                'unit' => isset( $channel[ 'unit' ] ) ? $channel[ 'unit' ] : '',
+                                'formatted' => isset( $channel[ 'formatted' ] ) ? $channel[ 'formatted' ] : '',
+                                'medium_type' => 'water'
+                            ];
+                            $r[ 'main' ][] = $returnChannel;
+                            continue;
+                        }
+                        //EXTRA VALUES
+                        $returnChannel = [
+                            'name' => str_replace( '_', ' ', $channelKey ),
+                            'value' => isset( $channel[ 'value' ] ) ? $channel[ 'value' ] : 0,
+                            'unit' => isset( $channel[ 'unit' ] ) ? $channel[ 'unit' ] : '',
+                            'formatted' => isset( $channel[ 'formatted' ] ) ? $channel[ 'formatted' ] : '',
+                        ];
+                        $r[ 'extra' ][] = $returnChannel;
+                    }
+                }
+            }
+
+
         } else {
             if ($this->fport == 14 || $this->fport == 16) {
                 if (is_numeric( $data )) {
@@ -1958,14 +2273,14 @@ class nascv
 
                     // HEAT
                     // kWh => mWh
-                    if ($channel[ 'medium_type' ] === 'heat' && $value[ 'unit' ] === 'kWh') {
+                    if (isset( $channel[ 'medium_type' ] ) && $channel[ 'medium_type' ] === 'heat' && $value[ 'unit' ] === 'kWh') {
                         $channel[ 'unit' ] = 'MWh';
                         $channel[ 'value' ] = number_format( (($value[ 'value' ]) / 1000), 3, '.', '' );
                     }
 
                     // ELECTRICITY
                     // Wh => kWh
-                    if ($channel[ 'medium_type' ] === 'electricity') {
+                    if (isset( $channel[ 'medium_type' ] ) && $channel[ 'medium_type' ] === 'electricity') {
                         if ($value[ 'unit' ] === 'Wh') {
                             $channel[ 'unit' ] = 'kWh';
                             $channel[ 'value' ] = number_format( (($value[ 'value' ]) / 1000), 3, '.', '' );
@@ -2002,7 +2317,7 @@ class nascv
      * @param $library
      * @return string
      */
-    public function generateEncoder( $library )
+    public function generate_encoder( $library )
     {
         //TODO
         $lib = self::call_library( $library );

@@ -1,6 +1,7 @@
 <?php
+require_once 'components/registers.php';
 
-class aem
+class aem extends registers
 {
 
     public $nascv;
@@ -30,10 +31,6 @@ class aem
             ],
         ];
 
-        
-
-        
-
 
         # fport 25
         $struct[ 25 ] = [
@@ -43,7 +40,7 @@ class aem
 
             #main
             [ '_cnf' => [ 'repeat' => false ],
-                'counter' => [ 'type' => 'uint32','unit' => 'L']
+                'counter' => [ 'type' => 'uint32', 'unit' => 'L' ]
             ]
         ];
 
@@ -81,7 +78,7 @@ class aem
                     'patch' => [ 'type' => 'uint8' ],
                 ],
                 'reset_reason' => [ 'type' => 'byte', 'bits' => [ 'RFU', 'watchdog_reset', 'soft_reset', 'RFU', 'magnet_wakeup', 'RFU', 'RFU', 'nfc_wakeup' ] ]
-                
+
             ],
 
 
@@ -96,7 +93,7 @@ class aem
                 '_struct' => $struct[ 24 ],
             ],
         ];
-        
+
         if ($this->nascv->firmware >= 1.0) {
             include 'components/ukw.php';
         }
